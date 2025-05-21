@@ -174,9 +174,7 @@ def generate_certificates(data, template_path, mappings, output_dir):
         for i, entry in enumerate(data):
             # Create a filename based on name field or index
             if 'Name' in entry and entry['Name']:
-                # Sanitize name for filename
-                safe_name = "".join(c if c.isalnum() else "_" for c in entry['Name'])
-                filename = f"certificate_{safe_name}.docx"
+                filename = f"certificate_{entry['Name']}.docx"
             else:
                 filename = f"certificate_{i+1}.docx"
             

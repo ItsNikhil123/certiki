@@ -86,61 +86,40 @@ def generate_preview(excel_path, template_path, mappings, row_index, output_fold
         workbook = openpyxl.load_workbook(excel_path, data_only=True)
         sheet = workbook.active
         
-        # Get headers from first row
-        headers = [cell.value for cell in sheet[1] if cell.value is not None]
-        
-        # Calculate actual Excel row (add 2: +1 for header, +1 for 0-indexing)
-        excel_row_index = row_index + 2
-        row_values = list(sheet[excel_row_index])
-        
-        # Prepare data dictionary from the selected row
-        data = {}
-        for i, cell in enumerate(row_values):
-            if i < len(headers) and headers[i]:
-                header_name = headers[i]
-                cell_value = cell.value
-                
-                # Handle cell value based on type
-                if cell_value is None:
-                    data[header_name] = ""
-                elif isinstance(cell_value, datetime):
-                    data[header_name] = cell_value.strftime("%B %d, %Y")
-                else:
-                    data[header_name] = str(cell_value)
+        # Get the row values as a tuple (similar to main.py approach)
+        excel_row_index = row_index + 2  # +1 for header, +1 for 0-indexing
+        row = sheet[excel_row_index]
+        value_tuple = tuple(cell.value for cell in row)
         
         # Create preview filename
         preview_filename = f"preview_{os.path.basename(template_path)}"
         preview_path = os.path.join(output_folder, preview_filename)
         
-        # Load template
+        # Load template and check variables
         doc = DocxTemplate(template_path)
         template_vars = doc.get_undeclared_template_variables()
-        
-        # Create context data from mappings
-        context = {}
-        for template_var, excel_header in mappings.items():
-            if excel_header in data:
-                context[template_var] = data[excel_header]
-                logger.debug(f"Preview mapped {template_var} = {data[excel_header]}")
-            else:
-                context[template_var] = ""
-                logger.debug(f"Preview empty mapping for {template_var}")
-        
-        # Force add current date in multiple common formats
-        current_date = datetime.now().strftime("%B %d, %Y")
-        context['date'] = current_date
-        context['current_date'] = current_date
-        context['completion_date'] = current_date
-        context['issue_date'] = current_date
-        
-        # Add any template variable with "date" in the name
+        logger.debug("Template Variables found in document:")
         for var in template_vars:
-            if 'date' in var.lower() and var not in context:
-                context[var] = current_date
-                logger.debug(f"Preview added date field {var} = {current_date}")
-                
-        logger.debug(f"Preview final context: {context}")
-                
+            logger.debug(f"  - {var}")
+        
+        # Format the date using the format_date function
+        formatted_date = format_date(value_tuple[2])
+        logger.debug(f"Formatted date value: {formatted_date}")
+        
+        # Create context using exact template variable names
+        context = {}
+        for var in template_vars:
+            if var.lower() == 'name':
+                context[var] = value_tuple[0]
+            elif var.lower() == 'course':
+                context[var] = value_tuple[1]
+            elif 'date' in var.lower():
+                context[var] = formatted_date
+            elif var.lower() == 'instructor':
+                context[var] = value_tuple[3]
+        
+        logger.debug(f"Final context with exact template variables: {context}")
+        
         # Render and save the document
         doc.render(context)
         doc.save(preview_path)
